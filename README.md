@@ -1,4 +1,4 @@
-# `bevy_eventwork_mod_websockets`
+# `bevy_eventwork_mod_websockets` (BEMS)
 
 A crate that provides a websocket networking transport layer for [Bevy_eventwork](https://github.com/jamescarterbell/bevy_eventwork) that supports WASM and Native.
 
@@ -26,3 +26,9 @@ It just works.
     app.insert_resource(NetworkSettings::default());
 
 ```
+
+## Supported Eventwork Version
+
+| EventWork Version | Bems Version |
+|:----:|:-------:|
+|  0.8  |    0.1    |
