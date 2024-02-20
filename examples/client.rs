@@ -112,7 +112,7 @@ struct GlobalChatSettings {
 }
 
 impl FromWorld for GlobalChatSettings {
-    fn from_world(world: &mut World) -> Self {
+    fn from_world(_world: &mut World) -> Self {
         GlobalChatSettings {
             chat_style: TextStyle {
                 font_size: 20.,
@@ -381,7 +381,7 @@ fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
                                         ..default()
                                     },
                                 )
-                                .with_alignment(TextAlignment::Center),
+                                .with_justify(JustifyText::Center),
                                 ..Default::default()
                             });
                         });
@@ -408,7 +408,7 @@ fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
                                         ..default()
                                     },
                                 )
-                                .with_alignment(TextAlignment::Center),
+                                .with_justify(JustifyText::Center),
                                 ..Default::default()
                             });
                         });
