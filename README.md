@@ -27,8 +27,8 @@ It just works.
 
 ```
 
-## Supported Eventwork Version
+## Supported Eventwork + Bevy Version
 
-| EventWork Version | BEMW Version |
-|:----:|:-------:|
-|  0.8  |    0.1    |
+| EventWork Version | BEMW Version | Bevy Version |
+| :---------------: | :----------: | :----------: |
+|        0.8        |     0.1      |     0.13     |

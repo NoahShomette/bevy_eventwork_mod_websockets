@@ -1,6 +1,6 @@
 [package]
 name = "bevy_eventwork_mod_websockets"
-version = "0.2.0"
+version = "0.1.0"
 edition = "2021"
 resolver = "2"
 description = "A Websocket NetworkProvider for Bevy_eventwork"
