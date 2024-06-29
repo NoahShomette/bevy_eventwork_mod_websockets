@@ -21,7 +21,7 @@ maintenance = { status = "actively-developed" }
 bevy = "0.12.0"
 # Used for TCP provider
 async-std = { version = "1.12.0" }
-bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", branch = "wasm_core_features", default-features = false }
+bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", branch = "dynamic_serialization", default-features = false }
 bevy_eventwork_mod_websockets = {path = "../"}
 serde = { version = "1.0.190", features = ["derive"] }
 url = { version = "2.0.0" }

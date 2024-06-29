@@ -21,7 +21,9 @@ mod native_websocket {
     use async_trait::async_trait;
     use async_tungstenite::tungstenite::protocol::WebSocketConfig;
     use bevy::prelude::{debug, error, info, trace, Deref, DerefMut, Resource};
-    use bevy_eventwork::{error::NetworkError, managers::NetworkProvider, NetworkPacket};
+    use bevy_eventwork::{
+        error::NetworkError, managers::NetworkProvider, NetworkPacket, NetworkSerializer,
+    };
     use futures::AsyncReadExt;
     use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
     use ws_stream_tungstenite::WsStream;
@@ -32,7 +34,7 @@ mod native_websocket {
 
     #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
     #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-    impl NetworkProvider for NativeWesocketProvider {
+    impl<NS: NetworkSerializer> NetworkProvider<NS> for NativeWesocketProvider {
         type NetworkSettings = NetworkSettings;
 
         type Socket = WsStream<TcpStream>;
@@ -169,7 +171,7 @@ mod native_websocket {
                 }
                 info!("Message read");
 
-                let packet: NetworkPacket = match bincode::deserialize(&buffer[..length]) {
+                let packet: NetworkPacket = match NS::deserialize(&buffer[..length]) {
                     Ok(packet) => packet,
                     Err(err) => {
                         error!("Failed to decode network packet from: {}", err);
@@ -191,7 +193,7 @@ mod native_websocket {
             _settings: Self::NetworkSettings,
         ) {
             while let Ok(message) = messages.recv().await {
-                let encoded = match bincode::serialize(&message) {
+                let encoded = match NS::serialize(&message) {
                     Ok(encoded) => encoded,
                     Err(err) => {
                         error!("Could not encode packet {:?}: {}", message, err);
@@ -307,7 +309,9 @@ mod wasm_websocket {
     use async_io_stream::IoStream;
     use async_trait::async_trait;
     use bevy::prelude::{debug, error, info, trace, Deref, DerefMut, Resource};
-    use bevy_eventwork::{error::NetworkError, managers::NetworkProvider, NetworkPacket};
+    use bevy_eventwork::{
+        error::NetworkError, managers::NetworkProvider, NetworkPacket, NetworkSerializer,
+    };
     use futures::AsyncReadExt;
     use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
     use ws_stream_wasm::{WsMeta, WsStream, WsStreamIo};
@@ -317,7 +321,7 @@ mod wasm_websocket {
     pub struct WasmWebSocketProvider;
 
     #[async_trait(?Send)]
-    impl NetworkProvider for WasmWebSocketProvider {
+    impl<NS: NetworkSerializer> NetworkProvider<NS> for WasmWebSocketProvider {
         type NetworkSettings = NetworkSettings;
 
         type Socket = (WsMeta, WsStream);
@@ -440,7 +444,7 @@ mod wasm_websocket {
                 }
                 info!("Message read");
 
-                let packet: NetworkPacket = match bincode::deserialize(&buffer[..length]) {
+                let packet: NetworkPacket = match NS::deserialize(&buffer[..length]) {
                     Ok(packet) => packet,
                     Err(err) => {
                         error!("Failed to decode network packet from: {}", err);
@@ -462,7 +466,7 @@ mod wasm_websocket {
             _settings: Self::NetworkSettings,
         ) {
             while let Ok(message) = messages.recv().await {
-                let encoded = match bincode::serialize(&message) {
+                let encoded = match NS::serialize(&message) {
                     Ok(encoded) => encoded,
                     Err(err) => {
                         error!("Could not encode packet {:?}: {}", message, err);

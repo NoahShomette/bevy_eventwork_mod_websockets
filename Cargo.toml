@@ -51,3 +51,6 @@ async_io_stream = { version = "0.3.3" }
 bevy = { version = "0.13.0", features = ["default_font"] }
 serde = { version = "1.0.190", features = ["derive"] }
 serde_json = { version = "1.0.108" }
+
+[patch.crates-io]
+bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", default-features = false, branch = "dynamic_serialization"}
