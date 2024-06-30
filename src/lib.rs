@@ -118,7 +118,7 @@ mod native_websocket {
             messages: Sender<NetworkPacket>,
             settings: Self::NetworkSettings,
         ) {
-            let mut buffer = vec![0; settings.max_message_size.unwrap_or(64 << 20)];
+            let mut buffer = vec![0; settings.max_message_size.unwrap_or(usize::MAX)];
             loop {
                 info!("Reading message length");
                 let length = match read_half.read(&mut buffer[..8]).await {
