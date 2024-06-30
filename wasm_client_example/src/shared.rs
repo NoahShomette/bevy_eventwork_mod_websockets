@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use bevy_eventwork::{BincodeSerializer, NetworkMessage};
-use bevy_eventwork_mod_websockets::WebSocketProvider;
+use bevy_eventwork::NetworkMessage;
+use bevy_eventwork_mod_websockets::{json::JsonSerializer, WebSocketProvider};
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -28,7 +28,7 @@ pub fn client_register_network_messages(app: &mut App) {
 
     // The client registers messages that arrives from the server, so that
     // it is prepared to handle them. Otherwise, an error occurs.
-    app.listen_for_message::<NewChatMessage, WebSocketProvider, BincodeSerializer>();
+    app.listen_for_message::<NewChatMessage, WebSocketProvider, JsonSerializer>();
 }
 
 #[allow(unused)]
@@ -37,5 +37,5 @@ pub fn server_register_network_messages(app: &mut App) {
 
     // The server registers messages that arrives from a client, so that
     // it is prepared to handle them. Otherwise, an error occurs.
-    app.listen_for_message::<UserChatMessage, WebSocketProvider, BincodeSerializer>();
+    app.listen_for_message::<UserChatMessage, WebSocketProvider, JsonSerializer>();
 }

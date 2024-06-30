@@ -35,6 +35,10 @@ async-trait = "0.1.74"
 url = { version = "2.0.0" }
 futures = { version = "0.3.29" }
 
+serde_json = "1.0.118"
+serde = "1.0.203"
+
+
 # Used 1.33.0or Stream type and other ext
 futures-lite = "2.0.0"
 

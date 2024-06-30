@@ -1,8 +1,7 @@
 use bevy::tasks::TaskPool;
 use bevy::{prelude::*, tasks::TaskPoolBuilder};
-use bevy_eventwork::{
-    BincodeSerializer, ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent,
-};
+use bevy_eventwork::{ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent};
+use bevy_eventwork_mod_websockets::json::JsonSerializer;
 use bevy_eventwork_mod_websockets::{NetworkSettings, WebSocketProvider};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
@@ -15,7 +14,7 @@ fn main() {
     // Before we can register the potential message types, we
     // need to add the plugin
     app.add_plugins(bevy_eventwork::EventworkPlugin::<
-        BincodeSerializer,
+        JsonSerializer,
         WebSocketProvider,
         bevy::tasks::TaskPool,
     >::default());
@@ -41,13 +40,13 @@ fn main() {
 // On the server side, you need to setup networking. You do not need to do so at startup, and can start listening
 // at any time.
 fn setup_networking(
-    mut net: ResMut<Network<WebSocketProvider, BincodeSerializer>>,
+    mut net: ResMut<Network<WebSocketProvider, JsonSerializer>>,
     settings: Res<NetworkSettings>,
     task_pool: Res<EventworkRuntime<TaskPool>>,
 ) {
     let ip_address = "127.0.0.1".parse().expect("Could not parse ip address");
 
-    info!("Address of the server: {}", ip_address) ;
+    info!("Address of the server: {}", ip_address);
 
     let _socket_address = SocketAddr::new(ip_address, 8080);
 
@@ -71,7 +70,7 @@ struct Player(ConnectionId);
 
 fn handle_connection_events(
     mut commands: Commands,
-    net: Res<Network<WebSocketProvider, BincodeSerializer>>,
+    net: Res<Network<WebSocketProvider, JsonSerializer>>,
     mut network_events: EventReader<NetworkEvent>,
 ) {
     for event in network_events.read() {
@@ -91,7 +90,7 @@ fn handle_connection_events(
 // Receiving a new message is as simple as listening for events of `NetworkData<T>`
 fn handle_messages(
     mut new_messages: EventReader<NetworkData<shared::UserChatMessage>>,
-    net: Res<Network<WebSocketProvider, BincodeSerializer>>,
+    net: Res<Network<WebSocketProvider, JsonSerializer>>,
 ) {
     for message in new_messages.read() {
         let user = message.source();

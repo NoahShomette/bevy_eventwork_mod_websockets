@@ -1,3 +1,5 @@
+pub mod json;
+
 /// A provider for WebSockets
 #[cfg(not(target_arch = "wasm32"))]
 pub type WebSocketProvider = native_websocket::NativeWesocketProvider;
@@ -234,7 +236,7 @@ mod native_websocket {
     #[derive(Clone, Debug, Resource, Default, Deref, DerefMut)]
     #[allow(missing_copy_implementations)]
     /// Settings to configure the network, both client and server
-    pub struct NetworkSettings(WebSocketConfig);
+    pub struct NetworkSettings(pub WebSocketConfig);
 
     /// A special stream for recieving ws connections
     pub struct OwnedIncoming {
