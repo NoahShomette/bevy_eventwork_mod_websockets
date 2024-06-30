@@ -125,7 +125,7 @@ mod native_websocket {
                         info!("Client disconnected");
                         // TODO: probably want to do more than just quit the receive task.
                         //       to let eventwork know that the peer disconnected.
-                        continue;
+                        break;
                     }
                     Ok(8) => {
                         let bytes = &buffer[..8];
