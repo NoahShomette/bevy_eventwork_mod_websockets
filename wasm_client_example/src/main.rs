@@ -4,7 +4,9 @@ use bevy::{
     prelude::*,
     tasks::{TaskPool, TaskPoolBuilder},
 };
-use bevy_eventwork::{ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent};
+use bevy_eventwork::{
+    BincodeSerializer, ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent,
+};
 
 use bevy_eventwork_mod_websockets::{NetworkSettings, WebSocketProvider};
 
@@ -18,6 +20,7 @@ fn main() {
     // You need to add the `ClientPlugin` first before you can register
     // `ClientMessage`s
     app.add_plugins(bevy_eventwork::EventworkPlugin::<
+        BincodeSerializer,
         WebSocketProvider,
         bevy::tasks::TaskPool,
     >::default());
@@ -211,7 +214,7 @@ type GameChatMessages = ChatMessages<ChatMessage>;
 struct ConnectButton;
 
 fn handle_connect_button(
-    net: ResMut<Network<WebSocketProvider>>,
+    net: ResMut<Network<WebSocketProvider, BincodeSerializer>>,
     settings: Res<NetworkSettings>,
     interaction_query: Query<
         (&Interaction, &Children),
@@ -251,7 +254,7 @@ fn handle_connect_button(
 struct MessageButton;
 
 fn handle_message_button(
-    net: Res<Network<WebSocketProvider>>,
+    net: Res<Network<WebSocketProvider, BincodeSerializer>>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<MessageButton>)>,
     mut messages: Query<&mut GameChatMessages>,
 ) {
@@ -315,10 +318,7 @@ fn handle_chat_area(
     text.sections = sections;
 }
 
-fn setup_ui(
-    mut commands: Commands,
-    _materials: ResMut<Assets<ColorMaterial>>,
-) {
+fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
     commands.spawn(Camera2dBundle::default());
 
     commands.spawn((GameChatMessages::new(),));
@@ -385,7 +385,7 @@ fn setup_ui(
                                         ..default()
                                     },
                                 )
-                                .with_alignment(TextAlignment::Center),
+                                .with_justify(JustifyText::Center),
                                 ..Default::default()
                             });
                         });
@@ -412,7 +412,7 @@ fn setup_ui(
                                         ..default()
                                     },
                                 )
-                                .with_alignment(TextAlignment::Center),
+                                .with_justify(JustifyText::Center),
                                 ..Default::default()
                             });
                         });

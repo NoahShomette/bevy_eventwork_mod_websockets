@@ -18,10 +18,8 @@ maintenance = { status = "actively-developed" }
 
 [dependencies]
 # This is a bevy plugin
-bevy = "0.12.0"
-# Used for TCP provider
-async-std = { version = "1.12.0" }
+bevy = { version = "0.13.2", features = [] }
 bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", branch = "dynamic_serialization", default-features = false }
-bevy_eventwork_mod_websockets = {path = "../"}
+bevy_eventwork_mod_websockets = { path = "../" }
 serde = { version = "1.0.190", features = ["derive"] }
 url = { version = "2.0.0" }

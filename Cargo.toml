@@ -22,7 +22,7 @@ name = "server"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", branch = "dynamic_serialization" }
+bevy_eventwork = { version = "0.8", default-features = false }
 # This is a bevy plugin
 bevy = { version = "0.13.0", features = [], default-features = false }
 # Used for on wire serialization
@@ -53,4 +53,4 @@ serde = { version = "1.0.190", features = ["derive"] }
 serde_json = { version = "1.0.108" }
 
 [patch.crates-io]
-bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", default-features = false, branch = "dynamic_serialization"}
+bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", default-features = false }
