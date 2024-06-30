@@ -22,7 +22,7 @@ name = "server"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy_eventwork = { version = "0.8", default-features = false }
+bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", branch = "dynamic_serialization" }
 # This is a bevy plugin
 bevy = { version = "0.13.0", features = [], default-features = false }
 # Used for on wire serialization
