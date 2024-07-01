@@ -132,7 +132,11 @@ mod native_websocket {
                     Ok(8) => {
                         let bytes = &buffer[..8];
                         println!("{:?}", bytes);
-                        bytes.len()
+                        u64::from_be_bytes(
+                            bytes
+                                .try_into()
+                                .expect("Couldn't read bytes from connection!"),
+                        ) as usize
                     }
                     Ok(n) => {
                         error!(
