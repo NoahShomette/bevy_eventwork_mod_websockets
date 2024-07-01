@@ -118,7 +118,7 @@ mod native_websocket {
             messages: Sender<NetworkPacket>,
             settings: Self::NetworkSettings,
         ) {
-            let mut buffer = vec![0; settings.max_message_size.unwrap_or(usize::MAX)];
+            let mut buffer = vec![0; settings.max_message_size.unwrap_or(64 << 20)];
             loop {
                 info!("Reading message length");
                 let length = match read_half.read(&mut buffer[..8]).await {
@@ -131,6 +131,7 @@ mod native_websocket {
                     }
                     Ok(8) => {
                         let bytes = &buffer[..8];
+                        println!("{:?}", bytes);
                         u64::from_le_bytes(
                             bytes
                                 .try_into()
