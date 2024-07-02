@@ -41,6 +41,7 @@ serde = "1.0.203"
 
 # Used 1.33.0or Stream type and other ext
 futures-lite = "2.0.0"
+asynchronous-codec = { version = "*" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 async-tungstenite = { version = "0.25.0", features = ["async-std-runtime"] }
