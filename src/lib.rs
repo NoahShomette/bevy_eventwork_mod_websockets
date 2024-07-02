@@ -22,13 +22,12 @@ mod native_websocket {
     use async_std::net::{TcpListener, TcpStream};
     use async_trait::async_trait;
     use async_tungstenite::tungstenite::protocol::WebSocketConfig;
-    use asynchronous_codec::{BytesCodec, Framed, FramedRead};
     use bevy::prelude::{debug, error, info, trace, Deref, DerefMut, Resource};
     use bevy_eventwork::{
         error::NetworkError, managers::NetworkProvider, NetworkPacket, NetworkSerializer,
     };
     use futures::AsyncReadExt;
-    use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream, StreamExt};
+    use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
     use ws_stream_tungstenite::WsStream;
 
     /// A provider for WebSockets
@@ -115,38 +114,67 @@ mod native_websocket {
         }
 
         async fn recv_loop(
-            read_half: Self::ReadHalf,
+            mut read_half: Self::ReadHalf,
             messages: Sender<NetworkPacket>,
             settings: Self::NetworkSettings,
         ) {
-            let mut frame = FramedRead::new(read_half, BytesCodec);
+            let mut buffer = vec![0; settings.max_message_size.unwrap_or(64 << 20)];
             loop {
                 info!("Reading message length");
-                let bytes = match frame.try_next().await {
-                    Ok(opt_bytes) => match opt_bytes {
-                        Some(bytes) => bytes,
-                        None => continue,
-                    },
-                    Err(error) => {
+                let length = match read_half.read(&mut buffer[..8]).await {
+                    Ok(0) => {
                         // EOF, meaning the TCP stream has closed.
+                        info!("Client disconnected");
                         // TODO: probably want to do more than just quit the receive task.
-                        // to let eventwork know that the peer disconnected.
-                        info!("Client disconnected with error: {}", error);
+                        //       to let eventwork know that the peer disconnected.
+                        break;
+                    }
+                    Ok(8) => {
+                        let bytes = &buffer[..8];
+                        println!("{:?}", bytes);
+                        u64::from_le_bytes(
+                            bytes
+                                .try_into()
+                                .expect("Couldn't read bytes from connection!"),
+                        ) as usize
+                    }
+                    Ok(n) => {
+                        error!(
+                            "Could not read enough bytes for header. Expected 8, got {}",
+                            n
+                        );
+                        break;
+                    }
+                    Err(err) => {
+                        error!("Encountered error while fetching length: {}", err);
                         break;
                     }
                 };
-                info!("Message length: {}", bytes.len());
+                info!("Message length: {}", length);
 
-                if bytes.len() > settings.max_message_size.unwrap_or(64 << 20) {
+                if length > settings.max_message_size.unwrap_or(64 << 20) {
                     error!(
                         "Received too large packet: {} > {}",
-                        bytes.len(),
+                        length,
                         settings.max_message_size.unwrap_or(64 << 20)
                     );
                     break;
                 }
 
-                let packet: NetworkPacket = match NS::deserialize(&bytes.to_vec()) {
+                info!("Reading message into buffer");
+                match read_half.read_exact(&mut buffer[..length]).await {
+                    Ok(()) => (),
+                    Err(err) => {
+                        error!(
+                            "Encountered error while fetching stream of length {}: {}",
+                            length, err
+                        );
+                        break;
+                    }
+                }
+                info!("Message read");
+
+                let packet: NetworkPacket = match NS::deserialize(&buffer[..length]) {
                     Ok(packet) => packet,
                     Err(err) => {
                         error!("Failed to decode network packet from: {}", err);
