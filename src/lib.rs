@@ -168,6 +168,8 @@ mod native_websocket {
                         break;
                     }
                 }
+                info!("Message: {:?}", &buffer[..length]);
+
                 info!("Message read");
 
                 let packet: NetworkPacket = match NS::deserialize(&buffer[..length]) {
