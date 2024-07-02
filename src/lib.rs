@@ -1,5 +1,3 @@
-pub mod json;
-
 /// A provider for WebSockets
 #[cfg(not(target_arch = "wasm32"))]
 pub type WebSocketProvider = native_websocket::NativeWesocketProvider;
@@ -118,7 +116,7 @@ mod native_websocket {
             messages: Sender<NetworkPacket>,
             settings: Self::NetworkSettings,
         ) {
-            let mut buffer = vec![0; settings.max_message_size.unwrap_or(64 << 20)];
+            let mut buffer = vec![0; settings.max_message_size.unwrap_or(usize::MAX)];
             loop {
                 info!("Reading message length");
                 let length = match read_half.read(&mut buffer[..8]).await {
@@ -132,7 +130,11 @@ mod native_websocket {
                     Ok(8) => {
                         let bytes = &buffer[..8];
                         println!("{:?}", bytes);
-                        bytes[0] as usize
+                        u64::from_le_bytes(
+                            bytes
+                                .try_into()
+                                .expect("Couldn't read bytes from connection!"),
+                        ) as usize
                     }
                     Ok(n) => {
                         error!(
@@ -146,13 +148,12 @@ mod native_websocket {
                         break;
                     }
                 };
-                info!("Message length: {}", length);
 
-                if length > settings.max_message_size.unwrap_or(64 << 20) {
+                if length > settings.max_message_size.unwrap_or(usize::MAX) {
                     error!(
                         "Received too large packet: {} > {}",
                         length,
-                        settings.max_message_size.unwrap_or(64 << 20)
+                        settings.max_message_size.unwrap_or(usize::MAX)
                     );
                     break;
                 }
@@ -168,8 +169,6 @@ mod native_websocket {
                         break;
                     }
                 }
-                info!("Message: {:?}", &buffer[..length]);
-
                 info!("Message read");
 
                 let packet: NetworkPacket = match NS::deserialize(&buffer[..length]) {

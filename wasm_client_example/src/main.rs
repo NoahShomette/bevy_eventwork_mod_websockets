@@ -4,9 +4,11 @@ use bevy::{
     prelude::*,
     tasks::{TaskPool, TaskPoolBuilder},
 };
-use bevy_eventwork::{ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent};
+use bevy_eventwork::{
+    BincodeSerializer, ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent,
+};
 
-use bevy_eventwork_mod_websockets::{json::JsonSerializer, NetworkSettings, WebSocketProvider};
+use bevy_eventwork_mod_websockets::{NetworkSettings, WebSocketProvider};
 
 mod shared;
 
@@ -18,7 +20,7 @@ fn main() {
     // You need to add the `ClientPlugin` first before you can register
     // `ClientMessage`s
     app.add_plugins(bevy_eventwork::EventworkPlugin::<
-        JsonSerializer,
+        BincodeSerializer,
         WebSocketProvider,
         bevy::tasks::TaskPool,
     >::default());
@@ -212,7 +214,7 @@ type GameChatMessages = ChatMessages<ChatMessage>;
 struct ConnectButton;
 
 fn handle_connect_button(
-    net: ResMut<Network<WebSocketProvider, JsonSerializer>>,
+    net: ResMut<Network<WebSocketProvider, BincodeSerializer>>,
     settings: Res<NetworkSettings>,
     interaction_query: Query<
         (&Interaction, &Children),
@@ -252,7 +254,7 @@ fn handle_connect_button(
 struct MessageButton;
 
 fn handle_message_button(
-    net: Res<Network<WebSocketProvider, JsonSerializer>>,
+    net: Res<Network<WebSocketProvider, BincodeSerializer>>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<MessageButton>)>,
     mut messages: Query<&mut GameChatMessages>,
 ) {
