@@ -1,6 +1,7 @@
 #![allow(clippy::type_complexity)]
 
 use bevy::{
+    color::palettes,
     prelude::*,
     tasks::{TaskPool, TaskPoolBuilder},
 };
@@ -52,9 +53,6 @@ fn main() {
 
     app.run();
 }
-
-#[derive(Resource)]
-struct NetworkTaskPool(TaskPool);
 
 ///////////////////////////////////////////////////////////////
 ////////////// Incoming Message Handler ///////////////////////
@@ -122,7 +120,7 @@ impl FromWorld for GlobalChatSettings {
             },
             author_style: TextStyle {
                 font_size: 20.,
-                color: Color::RED,
+                color: palettes::css::RED.into(),
                 ..default()
             },
         }
@@ -315,10 +313,7 @@ fn handle_chat_area(
     text.sections = sections;
 }
 
-fn setup_ui(
-    mut commands: Commands,
-    _materials: ResMut<Assets<ColorMaterial>>,
-) {
+fn setup_ui(mut commands: Commands, _materials: ResMut<Assets<ColorMaterial>>) {
     commands.spawn(Camera2dBundle::default());
 
     commands.spawn((GameChatMessages::new(),));
@@ -359,7 +354,7 @@ fn setup_ui(
                         height: Val::Percent(10.0),
                         ..Default::default()
                     },
-                    background_color: Color::GRAY.into(),
+                    background_color: palettes::css::GRAY.into(),
                     ..Default::default()
                 })
                 .with_children(|parent_button_bar| {
@@ -385,7 +380,7 @@ fn setup_ui(
                                         ..default()
                                     },
                                 )
-                                .with_alignment(TextAlignment::Center),
+                                .with_justify(JustifyText::Center),
                                 ..Default::default()
                             });
                         });
@@ -412,7 +407,7 @@ fn setup_ui(
                                         ..default()
                                     },
                                 )
-                                .with_alignment(TextAlignment::Center),
+                                .with_justify(JustifyText::Center),
                                 ..Default::default()
                             });
                         });

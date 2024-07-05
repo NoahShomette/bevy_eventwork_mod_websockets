@@ -20,7 +20,7 @@ mod native_websocket {
     use async_std::net::{TcpListener, TcpStream};
     use async_trait::async_trait;
     use async_tungstenite::tungstenite::protocol::WebSocketConfig;
-    use bevy::prelude::{debug, error, info, trace, Deref, DerefMut, Resource};
+    use bevy::prelude::{error, info, trace, Deref, DerefMut, Resource};
     use bevy_eventwork::{error::NetworkError, managers::NetworkProvider, NetworkPacket};
     use futures::AsyncReadExt;
     use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
