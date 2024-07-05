@@ -1,34 +1,20 @@
-<html><head>
-    <link rel="stylesheet" href="/index-597d90855083f957.css">
-  
-<link rel="preload" href="/wasm_client_example-6ef5eaa2a858b507_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
-<link rel="modulepreload" href="/wasm_client_example-6ef5eaa2a858b507.js"></head>
-<body>
-<script type="module">import init from '/wasm_client_example-6ef5eaa2a858b507.js';init('/wasm_client_example-6ef5eaa2a858b507_bg.wasm');</script><script>(function () {
-    var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var url = protocol + '//' + window.location.host + '/_trunk/ws';
-    var poll_interval = 5000;
-    var reload_upon_connect = () => {
-        window.setTimeout(
-            () => {
-                // when we successfully reconnect, we'll force a
-                // reload (since we presumably lost connection to
-                // trunk due to it being killed, so it will have
-                // rebuilt on restart)
-                var ws = new WebSocket(url);
-                ws.onopen = () => window.location.reload();
-                ws.onclose = reload_upon_connect;
-            },
-            poll_interval);
-    };
+<html>
+  <head>
+    <link rel="stylesheet" href="/index-fe65950190f03c21.css" integrity="sha384&#x2D;pgQCpTXf5Gd2g3bMQt&#x2F;1fNJvznbtkReq&#x2F;e3ooBAB1MPzHOTtbFDd5&#x2F;tqXjQXrP4i"/>
+    
+<script type="module" nonce="bGT5bB4AteHZYEBek5ouoA==">
+import init, * as bindings from '/wasm_client_example-2672b8cfc9cd45d8.js';
+const wasm = await init('/wasm_client_example-2672b8cfc9cd45d8_bg.wasm');
 
-    var ws = new WebSocket(url);
-    ws.onmessage = (ev) => {
-        const msg = JSON.parse(ev.data);
-        if (msg.reload) {
-            window.location.reload();
-        }
-    };
-    ws.onclose = reload_upon_connect;
-})()
-</script></body></html>
+
+window.wasmBindings = bindings;
+
+
+dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
+
+</script>
+
+  
+<link rel="modulepreload" href="/wasm_client_example-2672b8cfc9cd45d8.js" crossorigin=anonymous integrity="sha384-Va93RXCiYjaiXQccSDFoJyWa+EWWeMIkg2VrSbYHiWGtX2zbD0EHvF+wA39sJKsZ">
+<link rel="preload" href="/wasm_client_example-2672b8cfc9cd45d8_bg.wasm" crossorigin=anonymous integrity="sha384-WhGmZmNeF0+LfSmlAR8Z4wqskWhXiaWBtzMWGt0axlS35qzYgkTzfQcyRthzTpx8" as="fetch" type="application/wasm"></head>
+</html>
