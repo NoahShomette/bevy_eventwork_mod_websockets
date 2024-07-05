@@ -365,11 +365,11 @@ mod wasm_websocket {
                     }
                 };
 
-                if length > settings.max_message_size.unwrap_or(usize::MAX) {
+                if length > settings.max_message_size {
                     error!(
                         "Received too large packet: {} > {}",
                         length,
-                        settings.max_message_size.unwrap_or(usize::MAX)
+                        settings.max_message_size
                     );
                     break;
                 }
