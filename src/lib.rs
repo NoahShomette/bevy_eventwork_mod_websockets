@@ -114,10 +114,10 @@ mod native_websocket {
             messages: Sender<NetworkPacket>,
             settings: Self::NetworkSettings,
         ) {
-            let mut buffer = vec![0; settings.max_message_size.unwrap_or(64 << 20)];
+            let mut buffer = vec![0; settings.max_message_size.unwrap_or(usize::MAX)];
             loop {
                 info!("Reading message length");
-                let length = match read_half.read(&mut buffer[..8]).await {
+                let length = match read_half.read(&mut buffer).await {
                     Ok(0) => {
                         // EOF, meaning the TCP stream has closed.
                         info!("Client disconnected");
@@ -125,49 +125,21 @@ mod native_websocket {
                         //       to let eventwork know that the peer disconnected.
                         break;
                     }
-                    Ok(8) => {
-                        let bytes = &buffer[..8];
-                        u64::from_le_bytes(
-                            bytes
-                                .try_into()
-                                .expect("Couldn't read bytes from connection!"),
-                        ) as usize
-                    }
-                    Ok(n) => {
-                        error!(
-                            "Could not read enough bytes for header. Expected 8, got {}",
-                            n
-                        );
-                        break;
-                    }
+                    Ok(n) => n,
                     Err(err) => {
                         error!("Encountered error while fetching length: {}", err);
                         break;
                     }
                 };
-                info!("Message length: {}", length);
 
-                if length > settings.max_message_size.unwrap_or(64 << 20) {
+                if length > settings.max_message_size.unwrap_or(usize::MAX) {
                     error!(
                         "Received too large packet: {} > {}",
                         length,
-                        settings.max_message_size.unwrap_or(64 << 20)
+                        settings.max_message_size.unwrap_or(usize::MAX)
                     );
                     break;
                 }
-
-                info!("Reading message into buffer");
-                match read_half.read_exact(&mut buffer[..length]).await {
-                    Ok(()) => (),
-                    Err(err) => {
-                        error!(
-                            "Encountered error while fetching stream of length {}: {}",
-                            length, err
-                        );
-                        break;
-                    }
-                }
-                info!("Message read");
 
                 let packet: NetworkPacket = match bincode::deserialize(&buffer[..length]) {
                     Ok(packet) => packet,
@@ -198,17 +170,6 @@ mod native_websocket {
                         continue;
                     }
                 };
-
-                let len = encoded.len() as u64;
-                debug!("Sending a new message of size: {}", len);
-
-                match write_half.write(&len.to_le_bytes()).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        error!("Could not send packet length: {:?}: {}", len, err);
-                        break;
-                    }
-                }
 
                 trace!("Sending the content of the message!");
 
@@ -389,7 +350,7 @@ mod wasm_websocket {
             let mut buffer = vec![0; settings.max_message_size];
             loop {
                 info!("Reading message length");
-                let length = match read_half.read(&mut buffer[..8]).await {
+                let length = match read_half.read(&mut buffer).await {
                     Ok(0) => {
                         // EOF, meaning the TCP stream has closed.
                         info!("Client disconnected");
@@ -397,48 +358,21 @@ mod wasm_websocket {
                         //       to let eventwork know that the peer disconnected.
                         break;
                     }
-                    Ok(8) => {
-                        let bytes = &buffer[..8];
-                        u64::from_le_bytes(
-                            bytes
-                                .try_into()
-                                .expect("Couldn't read bytes from connection!"),
-                        ) as usize
-                    }
-                    Ok(n) => {
-                        error!(
-                            "Could not read enough bytes for header. Expected 8, got {}",
-                            n
-                        );
-                        break;
-                    }
+                    Ok(n) => n,
                     Err(err) => {
                         error!("Encountered error while fetching length: {}", err);
                         break;
                     }
                 };
-                info!("Message length: {}", length);
 
-                if length > settings.max_message_size {
+                if length > settings.max_message_size.unwrap_or(usize::MAX) {
                     error!(
                         "Received too large packet: {} > {}",
-                        length, settings.max_message_size
+                        length,
+                        settings.max_message_size.unwrap_or(usize::MAX)
                     );
                     break;
                 }
-
-                info!("Reading message into buffer");
-                match read_half.read_exact(&mut buffer[..length]).await {
-                    Ok(()) => (),
-                    Err(err) => {
-                        error!(
-                            "Encountered error while fetching stream of length {}: {}",
-                            length, err
-                        );
-                        break;
-                    }
-                }
-                info!("Message read");
 
                 let packet: NetworkPacket = match bincode::deserialize(&buffer[..length]) {
                     Ok(packet) => packet,
@@ -469,17 +403,6 @@ mod wasm_websocket {
                         continue;
                     }
                 };
-
-                let len = encoded.len() as u64;
-                debug!("Sending a new message of size: {}", len);
-
-                match write_half.write(&len.to_le_bytes()).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        error!("Could not send packet length: {:?}: {}", len, err);
-                        break;
-                    }
-                }
 
                 trace!("Sending the content of the message!");
 
