@@ -35,4 +35,5 @@ It just works.
 
 | EventWork Version | BEMW Version | Bevy Version |
 | :---------------: | :----------: | :----------: |
+|        0.9        |     0.2      |     0.14     |
 |        0.8        |     0.1      |     0.13     |
