@@ -472,7 +472,9 @@ mod wasm_websocket {
 
     #[derive(Clone, Debug, Resource, Deref, DerefMut)]
     #[allow(missing_copy_implementations)]
-    /// Settings to configure the network, both client and server
+    /// Settings to configure the network
+    /// 
+    /// Note that on WASM this is currently ignored and defaults are used
     pub struct NetworkSettings {
         max_message_size: usize,
     }
