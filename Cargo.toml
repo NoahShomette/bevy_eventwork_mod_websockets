@@ -58,4 +58,4 @@ serde = { version = "1.0.190", features = ["derive"] }
 serde_json = { version = "1.0.108" }
 
 [patch.crates-io]
-bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", branch = "0.14" }
+bevy_eventwork = { git = "https://github.com/jamescarterbell/bevy_eventwork.git", rev = "dd0e82587cf79c3df8f840f55e8a65e127220af6" }
