@@ -25,7 +25,7 @@ members = ["wasm_client_example"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy_eventwork = { git = "https://github.com/jamescarterbell/bevy_eventwork.git", rev = "dd0e82587cf79c3df8f840f55e8a65e127220af6" , default-features = false }
+bevy_eventwork = { version = "0.9", default-features = false }
 # This is a bevy plugin
 bevy = { version = "0.14.0", features = [], default-features = false }
 # Used for on wire serialization

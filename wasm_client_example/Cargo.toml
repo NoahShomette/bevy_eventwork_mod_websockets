@@ -19,7 +19,7 @@ maintenance = { status = "actively-developed" }
 [dependencies]
 # This is a bevy plugin
 bevy = "0.14.0"
-bevy_eventwork = { git = "https://github.com/jamescarterbell/bevy_eventwork.git", rev = "dd0e82587cf79c3df8f840f55e8a65e127220af6", default-features = false }
+bevy_eventwork = { version = "0.9", default-features = false }
 bevy_eventwork_mod_websockets = { path = "../" }
 serde = { version = "1.0.190", features = ["derive"] }
 url = { version = "2.0.0" }
