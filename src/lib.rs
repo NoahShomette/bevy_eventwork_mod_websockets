@@ -19,12 +19,17 @@ mod native_websocket {
     use async_channel::{Receiver, Sender};
     use async_std::net::{TcpListener, TcpStream};
     use async_trait::async_trait;
-    use async_tungstenite::tungstenite::protocol::WebSocketConfig;
-    use bevy::prelude::{debug, error, info, trace, Deref, DerefMut, Resource};
+    use async_tungstenite::{
+        tungstenite::{protocol::WebSocketConfig, Message},
+        WebSocketStream,
+    };
+    use bevy::prelude::{error, info, trace, Deref, DerefMut, Resource};
     use bevy_eventwork::{error::NetworkError, managers::NetworkProvider, NetworkPacket};
-    use futures::AsyncReadExt;
-    use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
-    use ws_stream_tungstenite::WsStream;
+    use futures::{
+        stream::{SplitSink, SplitStream},
+        SinkExt, StreamExt,
+    };
+    use futures_lite::{Future, FutureExt, Stream};
 
     /// A provider for WebSockets
     #[derive(Default, Debug)]
@@ -35,11 +40,11 @@ mod native_websocket {
     impl NetworkProvider for NativeWesocketProvider {
         type NetworkSettings = NetworkSettings;
 
-        type Socket = WsStream<TcpStream>;
+        type Socket = WebSocketStream<TcpStream>;
 
-        type ReadHalf = futures::io::ReadHalf<WsStream<TcpStream>>;
+        type ReadHalf = SplitStream<WebSocketStream<TcpStream>>;
 
-        type WriteHalf = futures::io::WriteHalf<WsStream<TcpStream>>;
+        type WriteHalf = SplitSink<WebSocketStream<TcpStream>, Message>;
 
         type ConnectInfo = url::Url;
 
@@ -106,75 +111,60 @@ mod native_websocket {
                 }
             })?;
             info!("Connected!");
-            return Ok(WsStream::new(stream));
+            return Ok(stream);
         }
 
         async fn recv_loop(
             mut read_half: Self::ReadHalf,
             messages: Sender<NetworkPacket>,
-            settings: Self::NetworkSettings,
+            _settings: Self::NetworkSettings,
         ) {
-            let mut buffer = vec![0; settings.max_message_size.unwrap_or(64 << 20)];
             loop {
-                info!("Reading message length");
-                let length = match read_half.read(&mut buffer[..8]).await {
-                    Ok(0) => {
-                        // EOF, meaning the TCP stream has closed.
-                        info!("Client disconnected");
-                        // TODO: probably want to do more than just quit the receive task.
-                        //       to let eventwork know that the peer disconnected.
-                        break;
-                    }
-                    Ok(8) => {
-                        let bytes = &buffer[..8];
-                        u64::from_le_bytes(
-                            bytes
-                                .try_into()
-                                .expect("Couldn't read bytes from connection!"),
-                        ) as usize
-                    }
-                    Ok(n) => {
-                        error!(
-                            "Could not read enough bytes for header. Expected 8, got {}",
-                            n
-                        );
-                        break;
-                    }
-                    Err(err) => {
-                        error!("Encountered error while fetching length: {}", err);
-                        break;
+                let message = match read_half.next().await {
+                    Some(message) => match message {
+                        Ok(message) => message,
+                        Err(err) => match err {
+                            async_tungstenite::tungstenite::Error::ConnectionClosed
+                            | async_tungstenite::tungstenite::Error::AlreadyClosed => {
+                                error!("Connection Closed");
+                                break;
+                            }
+                            _ => {
+                                error!("Nonfatal error detected: {}", err);
+                                continue;
+                            }
+                        },
+                    },
+                    None => {
+                        continue;
                     }
                 };
-                info!("Message length: {}", length);
 
-                if length > settings.max_message_size.unwrap_or(64 << 20) {
-                    error!(
-                        "Received too large packet: {} > {}",
-                        length,
-                        settings.max_message_size.unwrap_or(64 << 20)
-                    );
-                    break;
-                }
-
-                info!("Reading message into buffer");
-                match read_half.read_exact(&mut buffer[..length]).await {
-                    Ok(()) => (),
-                    Err(err) => {
-                        error!(
-                            "Encountered error while fetching stream of length {}: {}",
-                            length, err
-                        );
+                let packet = match message {
+                    Message::Text(_) => {
+                        error!("Text Message Received");
                         break;
                     }
-                }
-                info!("Message read");
-
-                let packet: NetworkPacket = match bincode::deserialize(&buffer[..length]) {
-                    Ok(packet) => packet,
-                    Err(err) => {
-                        error!("Failed to decode network packet from: {}", err);
+                    Message::Binary(binary) => match bincode::deserialize(&binary) {
+                        Ok(packet) => packet,
+                        Err(err) => {
+                            error!("Failed to decode network packet from: {}", err);
+                            break;
+                        }
+                    },
+                    Message::Ping(_) => {
+                        error!("Ping Message Received");
                         break;
                     }
+                    Message::Pong(_) => {
+                        error!("Pong Message Received");
+                        break;
+                    }
+                    Message::Close(_) => {
+                        error!("Connection Closed");
+                        break;
+                    }
+                    Message::Frame(_) => todo!(),
                 };
 
                 if messages.send(packet).await.is_err() {
@@ -199,20 +189,12 @@ mod native_websocket {
                     }
                 };
 
-                let len = encoded.len() as u64;
-                debug!("Sending a new message of size: {}", len);
-
-                match write_half.write(&len.to_le_bytes()).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        error!("Could not send packet length: {:?}: {}", len, err);
-                        break;
-                    }
-                }
-
                 trace!("Sending the content of the message!");
 
-                match write_half.write_all(&encoded).await {
+                match write_half
+                    .send(async_tungstenite::tungstenite::Message::Binary(encoded))
+                    .await
+                {
                     Ok(_) => (),
                     Err(err) => {
                         error!("Could not send packet: {:?}: {}", message, err);
@@ -225,7 +207,8 @@ mod native_websocket {
         }
 
         fn split(combined: Self::Socket) -> (Self::ReadHalf, Self::WriteHalf) {
-            combined.split()
+            let (write, read) = combined.split();
+            (read, write)
         }
     }
 
@@ -237,7 +220,7 @@ mod native_websocket {
     /// A special stream for recieving ws connections
     pub struct OwnedIncoming {
         inner: TcpListener,
-        stream: Option<Pin<Box<dyn Future<Output = Option<WsStream<TcpStream>>>>>>,
+        stream: Option<Pin<Box<dyn Future<Output = Option<WebSocketStream<TcpStream>>>>>>,
     }
 
     impl OwnedIncoming {
@@ -250,7 +233,7 @@ mod native_websocket {
     }
 
     impl Stream for OwnedIncoming {
-        type Item = WsStream<TcpStream>;
+        type Item = WebSocketStream<TcpStream>;
 
         fn poll_next(
             self: Pin<&mut Self>,
@@ -270,11 +253,11 @@ mod native_websocket {
                     .map(|(s, _)| s)
                     .ok();
 
-                    let stream: WsStream<TcpStream> = match stream {
+                    let stream: WebSocketStream<TcpStream> = match stream {
                         Some(stream) => {
                             if let Some(stream) = async_tungstenite::accept_async(stream).await.ok()
                             {
-                                WsStream::new(stream)
+                                stream
                             } else {
                                 return None;
                             }
@@ -304,13 +287,16 @@ mod wasm_websocket {
     use std::{net::SocketAddr, pin::Pin};
 
     use async_channel::{Receiver, Sender};
-    use async_io_stream::IoStream;
     use async_trait::async_trait;
-    use bevy::prelude::{debug, error, info, trace, Deref, DerefMut, Resource};
+    use bevy::prelude::{error, info, trace, Deref, DerefMut, Resource};
     use bevy_eventwork::{error::NetworkError, managers::NetworkProvider, NetworkPacket};
-    use futures::AsyncReadExt;
-    use futures_lite::{AsyncWriteExt, Future, FutureExt, Stream};
-    use ws_stream_wasm::{WsMeta, WsStream, WsStreamIo};
+    use futures::{
+        stream::{SplitSink, SplitStream},
+        SinkExt, StreamExt,
+    };
+    use futures_lite::Stream;
+    use send_wrapper::SendWrapper;
+    use tokio_tungstenite_wasm::{Message, WebSocketStream};
 
     /// A provider for WebSockets
     #[derive(Default, Debug)]
@@ -320,11 +306,11 @@ mod wasm_websocket {
     impl NetworkProvider for WasmWebSocketProvider {
         type NetworkSettings = NetworkSettings;
 
-        type Socket = (WsMeta, WsStream);
+        type Socket = SendWrapper<WebSocketStream>;
 
-        type ReadHalf = futures::io::ReadHalf<IoStream<WsStreamIo, Vec<u8>>>;
+        type ReadHalf = SendWrapper<SplitStream<WebSocketStream>>;
 
-        type WriteHalf = futures::io::WriteHalf<IoStream<WsStreamIo, Vec<u8>>>;
+        type WriteHalf = SendWrapper<SplitSink<WebSocketStream, Message>>;
 
         type ConnectInfo = url::Url;
 
@@ -333,7 +319,7 @@ mod wasm_websocket {
         type AcceptStream = OwnedIncoming;
 
         async fn accept_loop(
-            accept_info: Self::AcceptInfo,
+            _accept_info: Self::AcceptInfo,
             _: Self::NetworkSettings,
         ) -> Result<Self::AcceptStream, NetworkError> {
             panic!("Can't create servers on WASM");
@@ -341,109 +327,100 @@ mod wasm_websocket {
 
         async fn connect_task(
             connect_info: Self::ConnectInfo,
-            network_settings: Self::NetworkSettings,
+            _network_settings: Self::NetworkSettings,
         ) -> Result<Self::Socket, NetworkError> {
             info!("Beginning connection");
-            let stream =
-                WsMeta::connect(connect_info, None)
-                    .await
-                    .map_err(|error| match error {
-                        ws_stream_wasm::WsErr::InvalidWsState { supplied } => {
-                            NetworkError::Error(format!("Invalid Websocket State: {}", supplied))
-                        }
-                        ws_stream_wasm::WsErr::ConnectionNotOpen => {
-                            NetworkError::Error(format!("Connection Not Open"))
-                        }
-                        ws_stream_wasm::WsErr::InvalidUrl { supplied } => {
-                            NetworkError::Error(format!("Invalid URL: {}", supplied))
-                        }
-                        ws_stream_wasm::WsErr::InvalidCloseCode { supplied } => {
-                            NetworkError::Error(format!("Invalid Close Code: {}", supplied))
-                        }
-                        ws_stream_wasm::WsErr::ReasonStringToLong => {
-                            NetworkError::Error(format!("Reason String To Long"))
-                        }
-                        ws_stream_wasm::WsErr::ConnectionFailed { event } => {
-                            NetworkError::Error(format!("Connection Failed: {:?}", event))
-                        }
-                        ws_stream_wasm::WsErr::InvalidEncoding => {
-                            NetworkError::Error(format!("IOnvalid Encoding"))
-                        }
-                        ws_stream_wasm::WsErr::CantDecodeBlob => {
-                            NetworkError::Error(format!("Cant Decode Blob"))
-                        }
-                        ws_stream_wasm::WsErr::UnknownDataType => {
-                            NetworkError::Error(format!("Unkown Data Type"))
-                        }
-                        _ => NetworkError::Error(format!("Error in Ws_Stream_Wasm")),
-                    })?;
+            let stream = tokio_tungstenite_wasm::connect(connect_info)
+                .await
+                .map_err(|error| match error {
+                    tokio_tungstenite_wasm::Error::ConnectionClosed => {
+                        NetworkError::Error(format!("Connection Closed"))
+                    }
+                    tokio_tungstenite_wasm::Error::AlreadyClosed => {
+                        NetworkError::Error(format!("Connection Already Closed"))
+                    }
+                    tokio_tungstenite_wasm::Error::Io(err) => {
+                        NetworkError::Error(format!("IO Error: {}", err))
+                    }
+                    tokio_tungstenite_wasm::Error::Tls(err) => {
+                        NetworkError::Error(format!("TLS Error: {}", err))
+                    }
+                    tokio_tungstenite_wasm::Error::Capacity(err) => {
+                        NetworkError::Error(format!("Capacity Error: {}", err))
+                    }
+                    tokio_tungstenite_wasm::Error::Protocol(err) => {
+                        NetworkError::Error(format!("Protocol Error: {}", err))
+                    }
+                    tokio_tungstenite_wasm::Error::WriteBufferFull(err) => {
+                        NetworkError::Error(format!("Write Buffer Full: {}", err))
+                    }
+                    tokio_tungstenite_wasm::Error::Utf8 => {
+                        NetworkError::Error(format!("UTF8 Encoding Error"))
+                    }
+                    tokio_tungstenite_wasm::Error::AttackAttempt => {
+                        NetworkError::Error(format!("Attack Attempt Detected"))
+                    }
+                    tokio_tungstenite_wasm::Error::Url(err) => {
+                        NetworkError::Error(format!("Url Error: {}", err))
+                    }
+                    tokio_tungstenite_wasm::Error::Http(err) => {
+                        NetworkError::Error(format!("HTTP Error: {:?}", err))
+                    }
+                    tokio_tungstenite_wasm::Error::HttpFormat(err) => {
+                        NetworkError::Error(format!("HTTP Format Error: {}", err))
+                    }
+                    tokio_tungstenite_wasm::Error::BlobFormatUnsupported => {
+                        NetworkError::Error(format!("Blob Format Unsupported"))
+                    }
+                    tokio_tungstenite_wasm::Error::UnknownFormat => {
+                        NetworkError::Error(format!("Invalid Format"))
+                    }
+                })?;
             info!("Connected!");
-            return Ok(stream);
+            return Ok(SendWrapper::new(stream));
         }
 
         async fn recv_loop(
             mut read_half: Self::ReadHalf,
             messages: Sender<NetworkPacket>,
-            settings: Self::NetworkSettings,
+            _settings: Self::NetworkSettings,
         ) {
-            let mut buffer = vec![0; settings.max_message_size];
             loop {
-                info!("Reading message length");
-                let length = match read_half.read(&mut buffer[..8]).await {
-                    Ok(0) => {
-                        // EOF, meaning the TCP stream has closed.
-                        info!("Client disconnected");
-                        // TODO: probably want to do more than just quit the receive task.
-                        //       to let eventwork know that the peer disconnected.
-                        break;
-                    }
-                    Ok(8) => {
-                        let bytes = &buffer[..8];
-                        u64::from_le_bytes(
-                            bytes
-                                .try_into()
-                                .expect("Couldn't read bytes from connection!"),
-                        ) as usize
-                    }
-                    Ok(n) => {
-                        error!(
-                            "Could not read enough bytes for header. Expected 8, got {}",
-                            n
-                        );
-                        break;
-                    }
-                    Err(err) => {
-                        error!("Encountered error while fetching length: {}", err);
-                        break;
+                let message = match read_half.next().await {
+                    Some(message) => match message {
+                        Ok(message) => message,
+                        Err(err) => match err {
+                            tokio_tungstenite_wasm::Error::ConnectionClosed
+                            | tokio_tungstenite_wasm::Error::AlreadyClosed => {
+                                error!("Connection Closed");
+                                break;
+                            }
+                            _ => {
+                                error!("Nonfatal error detected: {}", err);
+                                continue;
+                            }
+                        },
+                    },
+                    None => {
+                        continue;
                     }
                 };
-                info!("Message length: {}", length);
 
-                if length > settings.max_message_size {
-                    error!(
-                        "Received too large packet: {} > {}",
-                        length, settings.max_message_size
-                    );
-                    break;
-                }
-
-                info!("Reading message into buffer");
-                match read_half.read_exact(&mut buffer[..length]).await {
-                    Ok(()) => (),
-                    Err(err) => {
-                        error!(
-                            "Encountered error while fetching stream of length {}: {}",
-                            length, err
-                        );
+                let packet = match message {
+                    Message::Text(_) => {
+                        error!("Text Message Received");
                         break;
                     }
-                }
-                info!("Message read");
+                    Message::Binary(binary) => match bincode::deserialize(&binary) {
+                        Ok(packet) => packet,
+                        Err(err) => {
+                            error!("Failed to decode network packet from: {}", err);
+                            break;
+                        }
+                    },
 
-                let packet: NetworkPacket = match bincode::deserialize(&buffer[..length]) {
-                    Ok(packet) => packet,
-                    Err(err) => {
-                        error!("Failed to decode network packet from: {}", err);
+                    Message::Close(_) => {
+                        error!("Connection Closed");
                         break;
                     }
                 };
@@ -470,20 +447,12 @@ mod wasm_websocket {
                     }
                 };
 
-                let len = encoded.len() as u64;
-                debug!("Sending a new message of size: {}", len);
-
-                match write_half.write(&len.to_le_bytes()).await {
-                    Ok(_) => (),
-                    Err(err) => {
-                        error!("Could not send packet length: {:?}: {}", len, err);
-                        break;
-                    }
-                }
-
                 trace!("Sending the content of the message!");
 
-                match write_half.write_all(&encoded).await {
+                match write_half
+                    .send(tokio_tungstenite_wasm::Message::Binary(encoded))
+                    .await
+                {
                     Ok(_) => (),
                     Err(err) => {
                         error!("Could not send packet: {:?}: {}", message, err);
@@ -496,13 +465,16 @@ mod wasm_websocket {
         }
 
         fn split(combined: Self::Socket) -> (Self::ReadHalf, Self::WriteHalf) {
-            combined.1.into_io().split()
+            let (write, read) = combined.take().split();
+            (SendWrapper::new(read), SendWrapper::new(write))
         }
     }
 
     #[derive(Clone, Debug, Resource, Deref, DerefMut)]
     #[allow(missing_copy_implementations)]
-    /// Settings to configure the network, both client and server
+    /// Settings to configure the network
+    /// 
+    /// Note that on WASM this is currently ignored and defaults are used
     pub struct NetworkSettings {
         max_message_size: usize,
     }
@@ -519,11 +491,11 @@ mod wasm_websocket {
     pub struct OwnedIncoming;
 
     impl Stream for OwnedIncoming {
-        type Item = (WsMeta, WsStream);
+        type Item = SendWrapper<WebSocketStream>;
 
         fn poll_next(
             self: Pin<&mut Self>,
-            cx: &mut std::task::Context<'_>,
+            _cx: &mut std::task::Context<'_>,
         ) -> std::task::Poll<Option<Self::Item>> {
             panic!("WASM does not support servers");
         }
