@@ -1,8 +1,11 @@
 use bevy::tasks::TaskPool;
 use bevy::{prelude::*, tasks::TaskPoolBuilder};
-use bevy_eventwork::{ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use bevy_eventwork::managers::network::Network;
+use bevy_eventwork::managers::NetworkPacketSerdeFn;
+use bevy_eventwork::{ConnectionId, EventworkRuntime, NetworkData, NetworkEvent};
+use bevy_eventwork_mod_websockets::serde_json::{json_network_packet_de, json_network_packet_ser};
 use bevy_eventwork_mod_websockets::{NetworkSettings, WebSocketProvider};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 mod shared;
 
@@ -22,9 +25,14 @@ fn main() {
         TaskPoolBuilder::new().num_threads(2).build(),
     ));
 
+    app.insert_resource(NetworkPacketSerdeFn {
+        network_packet_de: json_network_packet_de,
+        network_packet_ser: json_network_packet_ser,
+    });
+
     // A good way to ensure that you are not forgetting to register
     // any messages is to register them where they are defined!
-    shared::server_register_network_messages(&mut app);
+    shared::register_network_messages(&mut app);
 
     app.add_systems(Startup, setup_networking);
     app.add_systems(Update, (handle_connection_events, handle_messages));
@@ -38,7 +46,7 @@ fn main() {
 // On the server side, you need to setup networking. You do not need to do so at startup, and can start listening
 // at any time.
 fn setup_networking(
-    mut net: ResMut<Network<WebSocketProvider>>,
+    mut net: Network<WebSocketProvider>,
     settings: Res<NetworkSettings>,
     task_pool: Res<EventworkRuntime<TaskPool>>,
 ) {
@@ -68,7 +76,7 @@ struct Player(ConnectionId);
 
 fn handle_connection_events(
     mut commands: Commands,
-    net: Res<Network<WebSocketProvider>>,
+    mut net: Network<WebSocketProvider>,
     mut network_events: EventReader<NetworkEvent>,
 ) {
     for event in network_events.read() {
@@ -88,7 +96,7 @@ fn handle_connection_events(
 // Receiving a new message is as simple as listening for events of `NetworkData<T>`
 fn handle_messages(
     mut new_messages: EventReader<NetworkData<shared::UserChatMessage>>,
-    net: Res<Network<WebSocketProvider>>,
+    mut net: Network<WebSocketProvider>,
 ) {
     for message in new_messages.read() {
         let user = message.source();

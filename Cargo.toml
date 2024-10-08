@@ -22,12 +22,16 @@ name = "server"
 [workspace]
 members = ["wasm_client_example"]
 
+[features]
+default = ["json"]
+json = ["dep:serde", "dep:serde_json"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy_eventwork = { version = "0.9", default-features = false }
+bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", default-features = false, branch = "true-dynamic-serialization-2" }
 # This is a bevy plugin
-bevy = { version = "0.14.0", features = [], default-features = false }
+bevy = { version = "0.14.2", features = [], default-features = false }
 # Used for on wire serialization
 bincode = "1.3.3"
 # Used for non-tokio dependent threaded message passing
@@ -37,6 +41,10 @@ async-trait = "0.1.74"
 # Websocket
 url = { version = "2.0.0" }
 futures = { version = "0.3.29" }
+
+# Json
+serde = { version = "1.0.190", features = ["derive"], optional = true }
+serde_json = { version = "1.0.108", optional = true }
 
 # Used 1.33.0or Stream type and other ext
 futures-lite = "2.0.0"
@@ -53,6 +61,5 @@ tokio-tungstenite-wasm = { version = "0.3.1" }
 send_wrapper = "^0.6"
 
 [dev-dependencies]
-bevy = { version = "0.14.0", features = ["default_font"] }
+bevy = { version = "0.14.2", features = ["default_font"] }
 serde = { version = "1.0.190", features = ["derive"] }
-serde_json = { version = "1.0.108" }

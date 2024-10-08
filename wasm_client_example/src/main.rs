@@ -5,7 +5,9 @@ use bevy::{
     prelude::*,
     tasks::{TaskPool, TaskPoolBuilder},
 };
-use bevy_eventwork::{ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent};
+use bevy_eventwork::{
+    managers::network::Network, ConnectionId, EventworkRuntime, NetworkData, NetworkEvent,
+};
 
 use bevy_eventwork_mod_websockets::{NetworkSettings, WebSocketProvider};
 
@@ -30,7 +32,7 @@ fn main() {
 
     // A good way to ensure that you are not forgetting to register
     // any messages is to register them where they are defined!
-    shared::client_register_network_messages(&mut app);
+    shared::register_network_messages(&mut app);
 
     app.add_systems(Startup, setup_ui);
 
@@ -209,7 +211,7 @@ type GameChatMessages = ChatMessages<ChatMessage>;
 struct ConnectButton;
 
 fn handle_connect_button(
-    net: ResMut<Network<WebSocketProvider>>,
+    net: Network<WebSocketProvider>,
     settings: Res<NetworkSettings>,
     interaction_query: Query<
         (&Interaction, &Children),
@@ -249,7 +251,7 @@ fn handle_connect_button(
 struct MessageButton;
 
 fn handle_message_button(
-    net: Res<Network<WebSocketProvider>>,
+    mut net: Network<WebSocketProvider>,
     interaction_query: Query<&Interaction, (Changed<Interaction>, With<MessageButton>)>,
     mut messages: Query<&mut GameChatMessages>,
 ) {
@@ -261,18 +263,12 @@ fn handle_message_button(
 
     for interaction in interaction_query.iter() {
         if let Interaction::Pressed = interaction {
-            match net.send_message(
+            net.send_message(
                 ConnectionId { id: 0 },
                 shared::UserChatMessage {
                     message: String::from("Hello there!"),
                 },
-            ) {
-                Ok(()) => (),
-                Err(err) => messages.add(SystemMessage::new(format!(
-                    "Could not send message: {}",
-                    err
-                ))),
-            }
+            );
         }
     }
 }
