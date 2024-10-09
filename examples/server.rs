@@ -1,10 +1,10 @@
 use bevy::tasks::TaskPool;
 use bevy::{prelude::*, tasks::TaskPoolBuilder};
 use bevy_eventwork::managers::network::Network;
-use bevy_eventwork::managers::NetworkPacketSerdeFn;
+use bevy_eventwork::managers::network_request::Request;
 use bevy_eventwork::{ConnectionId, EventworkRuntime, NetworkData, NetworkEvent};
-use bevy_eventwork_mod_websockets::serde_json::{json_network_packet_de, json_network_packet_ser};
 use bevy_eventwork_mod_websockets::{NetworkSettings, WebSocketProvider};
+use shared::{RequestStatus, StatusResponse};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 mod shared;
@@ -25,17 +25,20 @@ fn main() {
         TaskPoolBuilder::new().num_threads(2).build(),
     ));
 
-    app.insert_resource(NetworkPacketSerdeFn {
-        network_packet_de: json_network_packet_de,
-        network_packet_ser: json_network_packet_ser,
-    });
-
     // A good way to ensure that you are not forgetting to register
     // any messages is to register them where they are defined!
     shared::register_network_messages(&mut app);
+    shared::server_register_request_messages(&mut app);
 
     app.add_systems(Startup, setup_networking);
-    app.add_systems(Update, (handle_connection_events, handle_messages));
+    app.add_systems(
+        Update,
+        (
+            handle_connection_events,
+            handle_messages,
+            handle_request_status,
+        ),
+    );
 
     // We have to insert the WS [`NetworkSettings`] with our chosen settings.
     app.insert_resource(NetworkSettings::default());
@@ -107,5 +110,12 @@ fn handle_messages(
             name: format!("{}", user),
             message: message.message.clone(),
         });
+    }
+}
+
+/// A system that will read status requests and return the current status of the app.
+fn handle_request_status(mut network_events: EventReader<Request<RequestStatus>>) {
+    for event in network_events.read() {
+        let _ = event.clone().respond(StatusResponse { response: true });
     }
 }

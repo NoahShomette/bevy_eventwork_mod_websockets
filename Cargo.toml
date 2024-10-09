@@ -23,8 +23,8 @@ name = "server"
 members = ["wasm_client_example"]
 
 [features]
-default = ["json"]
-json = ["dep:serde", "dep:serde_json"]
+default = ["text"]
+text = ["dep:serde", "dep:serde_json"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

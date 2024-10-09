@@ -1,15 +1,23 @@
 #![allow(clippy::type_complexity)]
 
+use std::time::Duration;
+
 use bevy::{
     color::palettes,
     prelude::*,
     tasks::{TaskPool, TaskPoolBuilder},
+    time::common_conditions::on_timer,
 };
 use bevy_eventwork::{
-    managers::network::Network, ConnectionId, EventworkRuntime, NetworkData, NetworkEvent,
+    managers::{
+        network::Network,
+        network_request::{Requester, Response},
+    },
+    ConnectionId, EventworkRuntime, NetworkData, NetworkEvent,
 };
 
 use bevy_eventwork_mod_websockets::{NetworkSettings, WebSocketProvider};
+use shared::{RequestStatus, StatusResponse};
 
 mod shared;
 
@@ -33,6 +41,7 @@ fn main() {
     // A good way to ensure that you are not forgetting to register
     // any messages is to register them where they are defined!
     shared::register_network_messages(&mut app);
+    shared::client_register_request_messages(&mut app);
 
     app.add_systems(Startup, setup_ui);
 
@@ -43,6 +52,8 @@ fn main() {
             handle_message_button,
             handle_incoming_messages,
             handle_network_events,
+            poll_responses,
+            client_send_status_request.run_if(on_timer(Duration::from_secs(5))),
         ),
     );
 
@@ -97,6 +108,50 @@ fn handle_network_events(
             }
             NetworkEvent::Error(err) => {
                 messages.add(UserMessage::new(String::from("SYSTEM"), err.to_string()));
+            }
+        }
+    }
+}
+
+/// A resource that will hold our response object so we can poll it every frame
+#[derive(Resource)]
+struct StatusRequest(Option<Response<StatusResponse>>);
+
+/// A system that will send the status request and then store the response object in a resource
+fn client_send_status_request(
+    mut net: Requester<RequestStatus, WebSocketProvider>,
+    status_request: Option<ResMut<StatusRequest>>,
+    mut commands: Commands,
+) {
+    if let None = status_request {
+        let request_response = net.send_request(ConnectionId { id: 0 }, RequestStatus);
+
+        if let Ok(response) = request_response {
+            commands.insert_resource(StatusRequest(Some(response)));
+        }
+    }
+}
+
+/// A system that will poll responses every frame.
+fn poll_responses(
+    status_request: Option<ResMut<StatusRequest>>,
+    mut commands: Commands,
+    mut messages: Query<&mut GameChatMessages>,
+) {
+    let mut messages = if let Ok(messages) = messages.get_single_mut() {
+        messages
+    } else {
+        return;
+    };
+    if let Some(mut res) = status_request {
+        if let Some(response) = res.0.take() {
+            let result = response.try_recv();
+            match result {
+                Ok(status) => {
+                    commands.remove_resource::<StatusRequest>();
+                    messages.add(SystemMessage::new(format!("status: {}", status.response)));
+                }
+                Err(response) => res.0 = Some(response),
             }
         }
     }

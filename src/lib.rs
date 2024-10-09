@@ -25,9 +25,13 @@ mod native_websocket {
         tungstenite::{protocol::WebSocketConfig, Message},
         WebSocketStream,
     };
-    use bevy::prelude::{error, info, trace, Deref, DerefMut, Resource};
+    use bevy::{
+        prelude::{error, info, trace, Deref, DerefMut, Resource},
+        utils::HashMap,
+    };
     use bevy_eventwork::{
-        error::NetworkError, managers::NetworkProvider, NetworkPacket, NetworkSerializedData,
+        error::NetworkError, managers::NetworkProvider, NetworkDataTypes, NetworkPacket,
+        NetworkSerializedData,
     };
     use futures::{
         stream::{SplitSink, SplitStream},
@@ -122,7 +126,10 @@ mod native_websocket {
             mut read_half: Self::ReadHalf,
             messages: Sender<NetworkPacket>,
             _settings: Self::NetworkSettings,
-            network_packet_de: fn(data: NetworkSerializedData) -> Result<NetworkPacket, String>,
+            network_packet_de: HashMap<
+                NetworkDataTypes,
+                fn(data: NetworkSerializedData) -> Result<NetworkPacket, String>,
+            >,
         ) {
             loop {
                 let message = match read_half.next().await {
@@ -147,46 +154,61 @@ mod native_websocket {
 
                 let packet = match message {
                     Message::Text(text) => {
-                        if cfg!(feature = "json") {
-                            match network_packet_de(NetworkSerializedData::String(text)) {
-                                Ok(packet) => packet,
-                                Err(err) => {
-                                    error!("Failed to decode network packet from: {}", err);
-                                    break;
+                        if cfg!(feature = "text") {
+                            if let Some(de_fn) = network_packet_de.get(&NetworkDataTypes::Text) {
+                                match de_fn(NetworkSerializedData::Text(text)) {
+                                    Ok(packet) => packet,
+                                    Err(err) => {
+                                        error!("Failed to decode network packet from: {}", err);
+                                        continue;
+                                    }
                                 }
+                            } else {
+                                error!(
+                                    "Failed to decode network packet. No deserialization fn found"
+                                );
+                                continue;
                             }
                         } else {
                             error!("String message recieved and not supported. Enable JSON feature to accept string messages");
-                            break;
+                            continue;
                         }
                     }
                     Message::Binary(binary) => {
-                        match network_packet_de(NetworkSerializedData::Binary(binary)) {
-                            Ok(packet) => packet,
-                            Err(err) => {
-                                error!("Failed to decode network packet from: {}", err);
-                                break;
+                        if let Some(de_fn) = network_packet_de.get(&NetworkDataTypes::Binary) {
+                            match de_fn(NetworkSerializedData::Binary(binary)) {
+                                Ok(packet) => packet,
+                                Err(err) => {
+                                    error!("Failed to decode network packet from: {}", err);
+                                    continue;
+                                }
                             }
+                        } else {
+                            error!("Failed to decode network packet. No deserialization fn found");
+                            continue;
                         }
                     }
                     Message::Ping(_) => {
                         error!("Ping Message Received");
-                        break;
+                        continue;
                     }
                     Message::Pong(_) => {
                         error!("Pong Message Received");
-                        break;
+                        continue;
                     }
                     Message::Close(_) => {
                         error!("Connection Closed");
-                        break;
+                        continue;
                     }
-                    Message::Frame(_) => todo!(),
+                    Message::Frame(_) => {
+                        error!("Connection Closed");
+                        continue;
+                    }
                 };
 
                 if messages.send(packet).await.is_err() {
                     error!("Failed to send decoded message to eventwork");
-                    break;
+                    continue;
                 }
                 info!("Message deserialized and sent to eventwork");
             }
@@ -196,10 +218,17 @@ mod native_websocket {
             mut write_half: Self::WriteHalf,
             messages: Receiver<NetworkPacket>,
             _settings: Self::NetworkSettings,
-            network_packet_ser: fn(data: NetworkPacket) -> Result<NetworkSerializedData, String>,
+            network_packet_ser: HashMap<
+                String,
+                fn(data: NetworkPacket) -> Result<NetworkSerializedData, String>,
+            >,
         ) {
             while let Ok(message) = messages.recv().await {
-                let encoded = match network_packet_ser(message) {
+                let Some(ser_fn) = network_packet_ser.get(&message.kind()) else {
+                    error!("No serialization fn found for the given packet kind");
+                    continue;
+                };
+                let encoded = match ser_fn(message) {
                     Ok(encoded) => encoded,
                     Err(err) => {
                         error!("Could not encode packet: {}", err);
@@ -209,7 +238,7 @@ mod native_websocket {
 
                 trace!("Sending the content of the message!");
                 match encoded {
-                    NetworkSerializedData::String(text) => match write_half
+                    NetworkSerializedData::Text(text) => match write_half
                         .send(async_tungstenite::tungstenite::Message::Text(text))
                         .await
                     {
@@ -317,9 +346,13 @@ mod wasm_websocket {
 
     use async_channel::{Receiver, Sender};
     use async_trait::async_trait;
-    use bevy::prelude::{error, info, trace, Deref, DerefMut, Resource};
+    use bevy::{
+        prelude::{error, info, trace, Deref, DerefMut, Resource},
+        utils::HashMap,
+    };
     use bevy_eventwork::{
-        error::NetworkError, managers::NetworkProvider, NetworkPacket, NetworkSerializedData,
+        error::NetworkError, managers::NetworkProvider, NetworkDataTypes, NetworkPacket,
+        NetworkSerializedData,
     };
     use futures::{
         stream::{SplitSink, SplitStream},
@@ -415,7 +448,10 @@ mod wasm_websocket {
             mut read_half: Self::ReadHalf,
             messages: Sender<NetworkPacket>,
             _settings: Self::NetworkSettings,
-            network_packet_de: fn(data: NetworkSerializedData) -> Result<NetworkPacket, String>,
+            network_packet_de: HashMap<
+                NetworkDataTypes,
+                fn(data: NetworkSerializedData) -> Result<NetworkPacket, String>,
+            >,
         ) {
             loop {
                 let message = match read_half.next().await {
@@ -440,32 +476,44 @@ mod wasm_websocket {
 
                 let packet = match message {
                     Message::Text(text) => {
-                        if cfg!(feature = "json") {
-                            match network_packet_de(NetworkSerializedData::String(text)) {
-                                Ok(packet) => packet,
-                                Err(err) => {
-                                    error!("Failed to decode network packet from: {}", err);
-                                    break;
+                        if cfg!(feature = "text") {
+                            if let Some(de_fn) = network_packet_de.get(&NetworkDataTypes::Text) {
+                                match de_fn(NetworkSerializedData::Text(text)) {
+                                    Ok(packet) => packet,
+                                    Err(err) => {
+                                        error!("Failed to decode network packet from: {}", err);
+                                        continue;
+                                    }
                                 }
+                            } else {
+                                error!(
+                                    "Failed to decode network packet. No deserialization fn found"
+                                );
+                                continue;
                             }
                         } else {
                             error!("String message recieved and not supported. Enable JSON feature to accept string messages");
-                            break;
+                            continue;
                         }
                     }
                     Message::Binary(binary) => {
-                        match network_packet_de(NetworkSerializedData::Binary(binary)) {
-                            Ok(packet) => packet,
-                            Err(err) => {
-                                error!("Failed to decode network packet from: {}", err);
-                                break;
+                        if let Some(de_fn) = network_packet_de.get(&NetworkDataTypes::Binary) {
+                            match de_fn(NetworkSerializedData::Binary(binary)) {
+                                Ok(packet) => packet,
+                                Err(err) => {
+                                    error!("Failed to decode network packet from: {}", err);
+                                    continue;
+                                }
                             }
+                        } else {
+                            error!("Failed to decode network packet. No deserialization fn found");
+                            continue;
                         }
                     }
 
                     Message::Close(_) => {
                         error!("Connection Closed");
-                        break;
+                        continue;
                     }
                 };
 
@@ -481,10 +529,17 @@ mod wasm_websocket {
             mut write_half: Self::WriteHalf,
             messages: Receiver<NetworkPacket>,
             _settings: Self::NetworkSettings,
-            network_packet_ser: fn(data: NetworkPacket) -> Result<NetworkSerializedData, String>,
+            network_packet_ser: HashMap<
+                String,
+                fn(data: NetworkPacket) -> Result<NetworkSerializedData, String>,
+            >,
         ) {
             while let Ok(message) = messages.recv().await {
-                let encoded = match network_packet_ser(message) {
+                let Some(ser_fn) = network_packet_ser.get(&message.kind()) else {
+                    error!("No serialization fn found for the given packet kind");
+                    continue;
+                };
+                let encoded = match ser_fn(message) {
                     Ok(encoded) => encoded,
                     Err(err) => {
                         error!("Could not encode packet: {}", err);
@@ -494,8 +549,8 @@ mod wasm_websocket {
 
                 trace!("Sending the content of the message!");
                 match encoded {
-                    NetworkSerializedData::String(text) => match write_half
-                        .send(async_tungstenite::tungstenite::Message::Text(text))
+                    NetworkSerializedData::Text(text) => match write_half
+                        .send(tokio_tungstenite_wasm::Message::Text(text))
                         .await
                     {
                         Ok(_) => (),
@@ -505,7 +560,7 @@ mod wasm_websocket {
                         }
                     },
                     NetworkSerializedData::Binary(vec) => match write_half
-                        .send(async_tungstenite::tungstenite::Message::Binary(vec))
+                        .send(tokio_tungstenite_wasm::Message::Binary(vec))
                         .await
                     {
                         Ok(_) => (),
