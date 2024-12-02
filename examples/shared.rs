@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_eventwork::NetworkMessage;
-use serde::{Deserialize, Serialize};
 use bevy_eventwork_mod_websockets::WebSocketProvider;
+use serde::{Deserialize, Serialize};
 
 /////////////////////////////////////////////////////////////////////
 // In this example the client sends `UserChatMessage`s to the server,

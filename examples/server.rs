@@ -1,8 +1,8 @@
 use bevy::tasks::TaskPool;
 use bevy::{prelude::*, tasks::TaskPoolBuilder};
 use bevy_eventwork::{ConnectionId, EventworkRuntime, Network, NetworkData, NetworkEvent};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use bevy_eventwork_mod_websockets::{NetworkSettings, WebSocketProvider};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 mod shared;
 
