@@ -1,6 +1,6 @@
 [package]
 name = "bevy_eventwork_mod_websockets"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 resolver = "2"
 description = "A Websocket NetworkProvider for Bevy_eventwork"
@@ -9,6 +9,7 @@ repository = "https://github.com/NoahShomette/bevy_eventwork_mod_websockets"
 license = "MIT"
 categories = ["game-development", "network-programming"]
 autoexamples = false
+exclude = ["wasm_client_example"]
 
 [badges]
 maintenance = { status = "actively-developed" }
@@ -25,7 +26,7 @@ members = ["wasm_client_example"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", branch = "bevy-0.15", default-features = false }
+bevy_eventwork = { version = "0.10" }
 # This is a bevy plugin
 bevy = { version = "0.15.0", features = [], default-features = false }
 # Used for on wire serialization
