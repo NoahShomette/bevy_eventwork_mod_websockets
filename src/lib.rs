@@ -95,10 +95,10 @@ mod native_websocket {
                     NetworkError::Error(format!("Write Buffer Full Error: {}", buf))
                 }
                 async_tungstenite::tungstenite::Error::Utf8 => {
-                    NetworkError::Error(format!("Utf8 Error"))
+                    NetworkError::Error("Utf8 Error".to_string())
                 }
                 async_tungstenite::tungstenite::Error::AttackAttempt => {
-                    NetworkError::Error(format!("Attack Attempt"))
+                    NetworkError::Error("Attack Attempt".to_string())
                 }
                 async_tungstenite::tungstenite::Error::Url(url) => {
                     NetworkError::Error(format!("Url Error: {}", url))
@@ -218,6 +218,7 @@ mod native_websocket {
     pub struct NetworkSettings(WebSocketConfig);
 
     /// A special stream for recieving ws connections
+    #[allow(clippy::type_complexity)]
     pub struct OwnedIncoming {
         inner: TcpListener,
         stream: Option<Pin<Box<dyn Future<Output = Option<WebSocketStream<TcpStream>>>>>>,
@@ -254,15 +255,7 @@ mod native_websocket {
                     .ok();
 
                     let stream: WebSocketStream<TcpStream> = match stream {
-                        Some(stream) => {
-                            if let Some(stream) = async_tungstenite::accept_async(stream).await.ok()
-                            {
-                                stream
-                            } else {
-                                return None;
-                            }
-                        }
-
+                        Some(stream) => async_tungstenite::accept_async(stream).await.ok()?,
                         None => return None,
                     };
                     Some(stream)
@@ -473,7 +466,7 @@ mod wasm_websocket {
     #[derive(Clone, Debug, Resource, Deref, DerefMut)]
     #[allow(missing_copy_implementations)]
     /// Settings to configure the network
-    /// 
+    ///
     /// Note that on WASM this is currently ignored and defaults are used
     pub struct NetworkSettings {
         max_message_size: usize,

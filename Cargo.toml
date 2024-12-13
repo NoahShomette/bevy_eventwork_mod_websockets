@@ -1,6 +1,6 @@
 [package]
 name = "bevy_eventwork_mod_websockets"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 resolver = "2"
 description = "A Websocket NetworkProvider for Bevy_eventwork"
@@ -9,6 +9,7 @@ repository = "https://github.com/NoahShomette/bevy_eventwork_mod_websockets"
 license = "MIT"
 categories = ["game-development", "network-programming"]
 autoexamples = false
+exclude = ["wasm_client_example"]
 
 [badges]
 maintenance = { status = "actively-developed" }
@@ -25,24 +26,24 @@ members = ["wasm_client_example"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy_eventwork = { version = "0.9", default-features = false }
+bevy_eventwork = { version = "0.10" }
 # This is a bevy plugin
-bevy = { version = "0.14.0", features = [], default-features = false }
+bevy = { version = "0.15.0", features = [], default-features = false }
 # Used for on wire serialization
 bincode = "1.3.3"
 # Used for non-tokio dependent threaded message passing
-async-channel = "2.1.0"
+async-channel = "2.3.1"
 # Used for providers, which are async in nature
 async-trait = "0.1.74"
 # Websocket
-url = { version = "2.0.0" }
+url = { version = "2.5.4" }
 futures = { version = "0.3.29" }
 
 # Used 1.33.0or Stream type and other ext
-futures-lite = "2.0.0"
+futures-lite = "2.5.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-async-tungstenite = { version = "0.26.2", features = [
+async-tungstenite = { version = "0.28.0", features = [
     "async-std-runtime",
     "url",
 ] }
@@ -53,6 +54,6 @@ tokio-tungstenite-wasm = { version = "0.3.1" }
 send_wrapper = "^0.6"
 
 [dev-dependencies]
-bevy = { version = "0.14.0", features = ["default_font"] }
-serde = { version = "1.0.190", features = ["derive"] }
-serde_json = { version = "1.0.108" }
+bevy = { version = "0.15.0", features = ["default_font"] }
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = { version = "1.0.133" }
