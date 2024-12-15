@@ -1,6 +1,6 @@
 [package]
 name = "bevy_eventwork_mod_websockets"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 resolver = "2"
 description = "A Websocket NetworkProvider for Bevy_eventwork"
@@ -26,7 +26,7 @@ members = ["wasm_client_example"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy_eventwork = { version = "0.10" }
+bevy_eventwork = { version = "0.10", default-features = false }
 # This is a bevy plugin
 bevy = { version = "0.15.0", features = [], default-features = false }
 # Used for on wire serialization
