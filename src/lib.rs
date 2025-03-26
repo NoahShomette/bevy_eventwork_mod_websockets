@@ -117,6 +117,7 @@ mod native_websocket {
         async fn recv_loop(
             mut read_half: Self::ReadHalf,
             messages: Sender<NetworkPacket>,
+            errors: Sender<NetworkError>,
             _settings: Self::NetworkSettings,
         ) {
             loop {
@@ -127,10 +128,20 @@ mod native_websocket {
                             async_tungstenite::tungstenite::Error::ConnectionClosed
                             | async_tungstenite::tungstenite::Error::AlreadyClosed => {
                                 error!("Connection Closed");
+                                errors
+                                    .send(NetworkError::ConnectionClosed)
+                                    .await
+                                    .expect("Error channel has closed.");
                                 break;
                             }
                             _ => {
                                 error!("Nonfatal error detected: {}", err);
+                                errors
+                                    .send(NetworkError::Error(
+                                        "Nonfatal error detected".to_string(),
+                                    ))
+                                    .await
+                                    .expect("Error channel has closed.");
                                 continue;
                             }
                         },
@@ -143,33 +154,70 @@ mod native_websocket {
                 let packet = match message {
                     Message::Text(_) => {
                         error!("Text Message Received");
-                        break;
+                        errors
+                            .send(NetworkError::Error(
+                                "Invalid Message Type Received".to_string(),
+                            ))
+                            .await
+                            .expect("Error channel has closed.");
+                        continue;
                     }
                     Message::Binary(binary) => match bincode::deserialize(&binary) {
                         Ok(packet) => packet,
                         Err(err) => {
                             error!("Failed to decode network packet from: {}", err);
-                            break;
+                            errors
+                                .send(NetworkError::Serialization)
+                                .await
+                                .expect("Error channel has closed.");
+                            continue;
                         }
                     },
                     Message::Ping(_) => {
-                        error!("Ping Message Received");
-                        break;
+                        errors
+                            .send(NetworkError::Error(
+                                "Invalid Message Type Received".to_string(),
+                            ))
+                            .await
+                            .expect("Error channel has closed.");
+                        continue;
                     }
                     Message::Pong(_) => {
                         error!("Pong Message Received");
-                        break;
+                        errors
+                            .send(NetworkError::Error(
+                                "Invalid Message Type Received".to_string(),
+                            ))
+                            .await
+                            .expect("Error channel has closed.");
+                        continue;
                     }
                     Message::Close(_) => {
                         error!("Connection Closed");
+                        errors
+                            .send(NetworkError::ConnectionClosed)
+                            .await
+                            .expect("Error channel has closed.");
                         break;
                     }
-                    Message::Frame(_) => todo!(),
+                    Message::Frame(_) => {
+                        errors
+                            .send(NetworkError::Error(
+                                "Invalid Message Type Received".to_string(),
+                            ))
+                            .await
+                            .expect("Error channel has closed.");
+                        continue;
+                    }
                 };
 
                 if messages.send(packet).await.is_err() {
                     error!("Failed to send decoded message to eventwork");
-                    break;
+                    errors
+                        .send(NetworkError::SendError)
+                        .await
+                        .expect("Error channel has closed.");
+                    continue;
                 }
                 info!("Message deserialized and sent to eventwork");
             }
@@ -178,6 +226,7 @@ mod native_websocket {
         async fn send_loop(
             mut write_half: Self::WriteHalf,
             messages: Receiver<NetworkPacket>,
+            errors: Sender<NetworkError>,
             _settings: Self::NetworkSettings,
         ) {
             while let Ok(message) = messages.recv().await {
@@ -185,6 +234,10 @@ mod native_websocket {
                     Ok(encoded) => encoded,
                     Err(err) => {
                         error!("Could not encode packet {:?}: {}", message, err);
+                        errors
+                            .send(NetworkError::ReceiveError)
+                            .await
+                            .expect("Error channel has closed.");
                         continue;
                     }
                 };
@@ -198,7 +251,11 @@ mod native_websocket {
                     Ok(_) => (),
                     Err(err) => {
                         error!("Could not send packet: {:?}: {}", message, err);
-                        break;
+                        errors
+                            .send(NetworkError::SendError)
+                            .await
+                            .expect("Error channel has closed.");
+                        continue;
                     }
                 }
 
@@ -376,6 +433,7 @@ mod wasm_websocket {
         async fn recv_loop(
             mut read_half: Self::ReadHalf,
             messages: Sender<NetworkPacket>,
+            errors: Sender<NetworkError>,
             _settings: Self::NetworkSettings,
         ) {
             loop {
@@ -386,10 +444,20 @@ mod wasm_websocket {
                             tokio_tungstenite_wasm::Error::ConnectionClosed
                             | tokio_tungstenite_wasm::Error::AlreadyClosed => {
                                 error!("Connection Closed");
+                                errors
+                                    .send(NetworkError::ConnectionClosed)
+                                    .await
+                                    .expect("Error channel has closed.");
                                 break;
                             }
                             _ => {
                                 error!("Nonfatal error detected: {}", err);
+                                errors
+                                    .send(NetworkError::Error(
+                                        "Nonfatal error detected".to_string(),
+                                    ))
+                                    .await
+                                    .expect("Error channel has closed.");
                                 continue;
                             }
                         },
@@ -402,25 +470,43 @@ mod wasm_websocket {
                 let packet = match message {
                     Message::Text(_) => {
                         error!("Text Message Received");
-                        break;
+                        errors
+                            .send(NetworkError::Error(
+                                "Invalid Message Type Received".to_string(),
+                            ))
+                            .await
+                            .expect("Error channel has closed.");
+                        continue;
                     }
                     Message::Binary(binary) => match bincode::deserialize(&binary) {
                         Ok(packet) => packet,
                         Err(err) => {
                             error!("Failed to decode network packet from: {}", err);
-                            break;
+                            errors
+                                .send(NetworkError::Serialization)
+                                .await
+                                .expect("Error channel has closed.");
+                            continue;
                         }
                     },
 
                     Message::Close(_) => {
                         error!("Connection Closed");
+                        errors
+                            .send(NetworkError::ConnectionClosed)
+                            .await
+                            .expect("Error channel has closed.");
                         break;
                     }
                 };
 
                 if messages.send(packet).await.is_err() {
                     error!("Failed to send decoded message to eventwork");
-                    break;
+                    errors
+                        .send(NetworkError::SendError)
+                        .await
+                        .expect("Error channel has closed.");
+                    continue;
                 }
                 info!("Message deserialized and sent to eventwork");
             }
@@ -429,6 +515,7 @@ mod wasm_websocket {
         async fn send_loop(
             mut write_half: Self::WriteHalf,
             messages: Receiver<NetworkPacket>,
+            errors: Sender<NetworkError>,
             _settings: Self::NetworkSettings,
         ) {
             while let Ok(message) = messages.recv().await {
@@ -436,6 +523,10 @@ mod wasm_websocket {
                     Ok(encoded) => encoded,
                     Err(err) => {
                         error!("Could not encode packet {:?}: {}", message, err);
+                        errors
+                            .send(NetworkError::Serialization)
+                            .await
+                            .expect("Error channel has closed.");
                         continue;
                     }
                 };
@@ -449,6 +540,10 @@ mod wasm_websocket {
                     Ok(_) => (),
                     Err(err) => {
                         error!("Could not send packet: {:?}: {}", message, err);
+                        errors
+                            .send(NetworkError::SendError)
+                            .await
+                            .expect("Error channel has closed.");
                         break;
                     }
                 }
