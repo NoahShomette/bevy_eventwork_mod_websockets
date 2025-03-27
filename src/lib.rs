@@ -127,7 +127,8 @@ mod native_websocket {
                         Err(err) => match err {
                             async_tungstenite::tungstenite::Error::ConnectionClosed
                             | async_tungstenite::tungstenite::Error::AlreadyClosed
-                            | async_tungstenite::tungstenite::Error::Io(_) => {
+                            | async_tungstenite::tungstenite::Error::Io(_)
+                            | async_tungstenite::tungstenite::Error::Protocol(_) => {
                                 error!("Connection Closed");
                                 errors
                                     .send(NetworkError::ConnectionClosed)
