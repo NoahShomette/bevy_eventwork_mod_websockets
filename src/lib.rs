@@ -126,7 +126,8 @@ mod native_websocket {
                         Ok(message) => message,
                         Err(err) => match err {
                             async_tungstenite::tungstenite::Error::ConnectionClosed
-                            | async_tungstenite::tungstenite::Error::AlreadyClosed => {
+                            | async_tungstenite::tungstenite::Error::AlreadyClosed
+                            | async_tungstenite::tungstenite::Error::Io(_) => {
                                 error!("Connection Closed");
                                 errors
                                     .send(NetworkError::ConnectionClosed)
@@ -137,9 +138,10 @@ mod native_websocket {
                             _ => {
                                 error!("Nonfatal error detected: {}", err);
                                 errors
-                                    .send(NetworkError::Error(
-                                        "Nonfatal error detected".to_string(),
-                                    ))
+                                    .send(NetworkError::Error(format!(
+                                        "Nonfatal error detected: {}",
+                                        err
+                                    )))
                                     .await
                                     .expect("Error channel has closed.");
                                 continue;
