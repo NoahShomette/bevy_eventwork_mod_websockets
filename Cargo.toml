@@ -1,6 +1,6 @@
 [package]
 name = "bevy_eventwork_mod_websockets"
-version = "0.3.1"
+version = "0.4.0"
 edition = "2021"
 resolver = "2"
 description = "A Websocket NetworkProvider for Bevy_eventwork"
@@ -26,9 +26,9 @@ members = ["wasm_client_example"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", branch = "network-error", default-features = false }
+bevy_eventwork = { git = "https://github.com/NoahShomette/bevy_eventwork.git", branch = "main", default-features = false }
 # This is a bevy plugin
-bevy = { version = "0.15.0", features = [], default-features = false }
+bevy = { version = "0.20.0", features = [], default-features = false }
 # Used for on wire serialization
 bincode = "1.3.3"
 # Used for non-tokio dependent threaded message passing
@@ -54,6 +54,6 @@ tokio-tungstenite-wasm = { version = "0.3.1" }
 send_wrapper = "^0.6"
 
 [dev-dependencies]
-bevy = { version = "0.15.0", features = ["default_font"] }
+bevy = { version = "0.20.0", features = ["default_font"] }
 serde = { version = "1.0.215", features = ["derive"] }
 serde_json = { version = "1.0.133" }
