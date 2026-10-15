@@ -69,7 +69,7 @@ struct Player(ConnectionId);
 fn handle_connection_events(
     mut commands: Commands,
     net: Res<Network<WebSocketProvider>>,
-    mut network_events: EventReader<NetworkEvent>,
+    mut network_events: MessageReader<NetworkEvent>,
 ) {
     for event in network_events.read() {
         if let NetworkEvent::Connected(conn_id) = event {
@@ -87,7 +87,7 @@ fn handle_connection_events(
 
 // Receiving a new message is as simple as listening for events of `NetworkData<T>`
 fn handle_messages(
-    mut new_messages: EventReader<NetworkData<shared::UserChatMessage>>,
+    mut new_messages: MessageReader<NetworkData<shared::UserChatMessage>>,
     net: Res<Network<WebSocketProvider>>,
 ) {
     for message in new_messages.read() {

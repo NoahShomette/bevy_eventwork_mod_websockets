@@ -35,7 +35,7 @@
           devShells.default = pkgs.mkShell {
             name = "bevy-flake-fenix";
             packages = [
-              packages.rust-toolchain.develop
+              packages.rust-toolchain
               packages.dioxus-cli.develop
               # packages.bevy-cli.develop
             ];

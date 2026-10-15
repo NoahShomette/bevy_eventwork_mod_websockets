@@ -17,19 +17,16 @@ mod native_websocket {
     use std::{net::SocketAddr, pin::Pin};
 
     use async_channel::{Receiver, Sender};
-    use async_std::net::{TcpListener, TcpStream};
     use async_trait::async_trait;
     use async_tungstenite::{
-        tungstenite::{protocol::WebSocketConfig, Message},
-        WebSocketStream,
+        tungstenite::{protocol::WebSocketConfig, Bytes, Message},
+        WebSocketReceiver, WebSocketSender, WebSocketStream,
     };
     use bevy::prelude::{error, info, trace, Deref, DerefMut, Resource};
     use bevy_eventwork::{error::NetworkError, managers::NetworkProvider, NetworkPacket};
-    use futures::{
-        stream::{SplitSink, SplitStream},
-        SinkExt, StreamExt,
-    };
+    use futures::StreamExt;
     use futures_lite::{Future, FutureExt, Stream};
+    use smol::net::{TcpListener, TcpStream};
 
     /// A provider for WebSockets
     #[derive(Default, Debug)]
@@ -42,9 +39,9 @@ mod native_websocket {
 
         type Socket = WebSocketStream<TcpStream>;
 
-        type ReadHalf = SplitStream<WebSocketStream<TcpStream>>;
+        type ReadHalf = WebSocketReceiver<TcpStream>;
 
-        type WriteHalf = SplitSink<WebSocketStream<TcpStream>, Message>;
+        type WriteHalf = WebSocketSender<TcpStream>;
 
         type ConnectInfo = url::Url;
 
@@ -67,7 +64,7 @@ mod native_websocket {
             network_settings: Self::NetworkSettings,
         ) -> Result<Self::Socket, NetworkError> {
             info!("Beginning connection");
-            let (stream, _response) = async_tungstenite::async_std::connect_async_with_config(
+            let (stream, _response) = async_tungstenite::smol::connect_async_with_config(
                 connect_info,
                 Some(*network_settings),
             )
@@ -94,8 +91,8 @@ mod native_websocket {
                 async_tungstenite::tungstenite::Error::WriteBufferFull(buf) => {
                     NetworkError::Error(format!("Write Buffer Full Error: {}", buf))
                 }
-                async_tungstenite::tungstenite::Error::Utf8 => {
-                    NetworkError::Error("Utf8 Error".to_string())
+                async_tungstenite::tungstenite::Error::Utf8(string) => {
+                    NetworkError::Error(format!("UTF8 Error: {}", string))
                 }
                 async_tungstenite::tungstenite::Error::AttackAttempt => {
                     NetworkError::Error("Attack Attempt".to_string())
@@ -248,7 +245,9 @@ mod native_websocket {
                 trace!("Sending the content of the message!");
 
                 match write_half
-                    .send(async_tungstenite::tungstenite::Message::Binary(encoded))
+                    .send(async_tungstenite::tungstenite::Message::Binary(
+                        Bytes::from(encoded),
+                    ))
                     .await
                 {
                     Ok(_) => (),
@@ -375,7 +374,9 @@ mod wasm_websocket {
             _accept_info: Self::AcceptInfo,
             _: Self::NetworkSettings,
         ) -> Result<Self::AcceptStream, NetworkError> {
-            panic!("Can't create servers on WASM");
+            return Err(NetworkError::Listen(std::io::Error::from(
+                std::io::ErrorKind::Unsupported,
+            )));
         }
 
         async fn connect_task(
@@ -383,6 +384,7 @@ mod wasm_websocket {
             _network_settings: Self::NetworkSettings,
         ) -> Result<Self::Socket, NetworkError> {
             info!("Beginning connection");
+            web_sys::console::log_1(&"Beginning connection".into());
             let stream = tokio_tungstenite_wasm::connect(connect_info)
                 .await
                 .map_err(|error| match error {
@@ -407,8 +409,8 @@ mod wasm_websocket {
                     tokio_tungstenite_wasm::Error::WriteBufferFull(err) => {
                         NetworkError::Error(format!("Write Buffer Full: {}", err))
                     }
-                    tokio_tungstenite_wasm::Error::Utf8 => {
-                        NetworkError::Error(format!("UTF8 Encoding Error"))
+                    tokio_tungstenite_wasm::Error::Utf8(string) => {
+                        NetworkError::Error(format!("UTF8 Error: {}", string))
                     }
                     tokio_tungstenite_wasm::Error::AttackAttempt => {
                         NetworkError::Error(format!("Attack Attempt Detected"))
@@ -427,6 +429,9 @@ mod wasm_websocket {
                     }
                     tokio_tungstenite_wasm::Error::UnknownFormat => {
                         NetworkError::Error(format!("Invalid Format"))
+                    }
+                    tokio_tungstenite_wasm::Error::Sending => {
+                        NetworkError::Error(format!("Sending Error"))
                     }
                 })?;
             info!("Connected!");
@@ -537,7 +542,9 @@ mod wasm_websocket {
                 trace!("Sending the content of the message!");
 
                 match write_half
-                    .send(tokio_tungstenite_wasm::Message::Binary(encoded))
+                    .send(tokio_tungstenite_wasm::Message::Binary(
+                        tokio_tungstenite_wasm::Bytes::from(encoded),
+                    ))
                     .await
                 {
                     Ok(_) => (),
