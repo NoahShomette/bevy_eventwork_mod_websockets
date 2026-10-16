@@ -52,7 +52,7 @@ smol = { version = "2.0" }
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 tokio-tungstenite-wasm = { version = "0.9" }
 send_wrapper = "^0.6"
-web-sys = "*"
+web-sys = "0.3.106"
 
 [dev-dependencies]
 bevy = { version = "0.20", features = ["default_font"] }
