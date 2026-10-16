@@ -44,12 +44,12 @@ fn setup_networking(
 ) {
     let ip_address = "127.0.0.1".parse().expect("Could not parse ip address");
 
-    info!("Address of the server: {}", ip_address);
-
-    let _socket_address = SocketAddr::new(ip_address, 8080);
+    let socket_address = SocketAddr::new(ip_address, 8081);
+    
+    info!("Address of the server: {}", socket_address);
 
     match net.listen(
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8081),
+        socket_address,
         &task_pool.0,
         &settings,
     ) {

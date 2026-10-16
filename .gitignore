@@ -2,4 +2,4 @@
 /Cargo.lock
 /wasm_client_example/target
 /wasm_client_example/dist
-.direnv
+.cargo/
